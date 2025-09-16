@@ -1,0 +1,27 @@
+{
+  "name": "ono",
+  "version": "0.1.0",
+  "description": "Outposts and Orcs",
+  "main": "index.js",
+  "scripts": {
+    "test": "jest",
+    "build": "node build_aid.js",
+    "clean": "rm -rf dist",
+    "run" : "node dist/index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/neolaw84/ono.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/neolaw84/ono/issues"
+  },
+  "homepage": "https://github.com/neolaw84/ono#readme",
+  "devDependencies": {
+    "esbuild": "^0.25.9",
+    "jest": "^30.1.3"
+  }
+}
