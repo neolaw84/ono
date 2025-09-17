@@ -3,7 +3,7 @@
  * @description This file demonstrates how to dynamically load a rulebook and run a turn-based encounter.
  */
 
-const rulebookName = 'oxo';
+const rulebookName = 'ono';
 const systemName = 'cli';
 
 function setupGame() {

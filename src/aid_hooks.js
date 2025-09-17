@@ -3,11 +3,10 @@
  * @description Contains the onInput, onContext, and onOutput hooks for AI Dungeon.
  */
 
-const rulebookName = 'oxo';
+const rulebookName = 'ono';
 const systemName = 'aid';
 
 const { World } = require(`./${rulebookName}/world.js`);
-// const { plotEssentials, authorsNote } = require(`./${rulebookName}/rules.js`); // <-- Changed
 const { EventFormatter } = require(`./${rulebookName}/event_formatter.js`);
 const { ONOConsole } = require(`./${systemName}/ono_console.js`);
 
