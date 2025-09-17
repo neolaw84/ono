@@ -92,7 +92,7 @@ class ONOConsole {
 
     getRawPlayerInput(text) {
 
-        return "#HeavyStrike_0"; // Default action for non-interactive execution
+        return "HeavyStrike_0"; // Default action for non-interactive execution
     }
 
     parsePlayerInput(rawInput, worldInstance) {

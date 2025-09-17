@@ -6,9 +6,11 @@
 const rulebookName = 'oxo';
 const systemName = 'aid';
 
-const { World, plotEssentials, authorsNote } = require(`./${rulebookName}/world.js`);
+const { World } = require(`./${rulebookName}/world.js`);
+// const { plotEssentials, authorsNote } = require(`./${rulebookName}/rules.js`); // <-- Changed
 const { EventFormatter } = require(`./${rulebookName}/event_formatter.js`);
 const { ONOConsole } = require(`./${systemName}/ono_console.js`);
+
 
 /**
  * Loads the game state, initializing a new world if one doesn't exist.
@@ -22,13 +24,11 @@ function loadGame() {
         World.initialize(onoConsoleInstance, formatter); 
         worldInstance = World.getInstance();
         
-        
         const player = worldInstance.createPlayerCharacter();
         const orc = new worldInstance.Entities.Orc({ name: 'Grimgor', numAttrs: { hp: 60, strength: 15, defense: 5 } });
         worldInstance.getOrCreateEncounter([orc]);
         worldInstance.updateEncounterPhase();
         
-
         state.initialized = true;
     } else {
         
