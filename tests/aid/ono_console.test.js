@@ -37,10 +37,10 @@ describe('ONOConsole', () => {
         expect(consoleSpy).toHaveBeenCalledWith('[HUD] --- CLEARED ---');
     });
     
-    test('promptForInput should resolve with a default name for testing', async () => {
+    test('promptForInput should resolve with a default name for testing', () => {
         const consoleInstance = ONOConsole.getInstance();
         const question = "What is your name?";
-        const name = await consoleInstance.promptForInput(question);
+        const name = consoleInstance.promptForInput(question);
         
         expect(consoleSpy).toHaveBeenCalledWith(`[INPUT] ${question}`);
         expect(name).toBe('Hero');

@@ -8,15 +8,78 @@ class iAttributes {
     constructor() { 
         if (this.constructor === iAttributes) throw new Error("Abstract class 'iAttributes' cannot be instantiated directly."); 
     } 
-    toArray() { 
-        throw new Error("Method 'toArray()' must be implemented."); 
-    } 
-    fromArray() { 
-        throw new Error("Method 'fromArray()' must be implemented."); 
-    } 
+    /**
+     * Gets the value of a specific attribute.
+     * @param {string} key The name of the attribute.
+     */
+    get(key) { throw new Error("Method 'get(key)' must be implemented."); }
+    /**
+     * Sets the value of a specific attribute.
+     * @param {string} key The name of the attribute.
+     * @param {*} value The new value.
+     */
+    set(key, value) { throw new Error("Method 'set(key, value)' must be implemented."); }
+    /**
+     * Returns an array of all attribute keys.
+     * @returns {string[]}
+     */
+    keys() { throw new Error("Method 'keys()' must be implemented."); }
+    toArray() { throw new Error("Method 'toArray()' must be implemented."); } 
+    fromArray() { throw new Error("Method 'fromArray()' must be implemented."); } 
+    /**
+     * Serializes the attribute's state to a plain object.
+     * @returns {object} A serializable object.
+     */
+    toData() { throw new Error("Method 'toData()' must be implemented."); }
+    /**
+     * Deserializes data into a new class instance.
+     * @param {object} data The plain object to deserialize.
+     * @returns {iAttributes} A new instance of the class.
+     */
+    static fromData(data) { throw new Error("Static method 'fromData()' must be implemented."); }
 }
-class iAction { constructor() { if (this.constructor === iAction) throw new Error("Abstract class 'iAction' cannot be instantiated directly."); } apply() { throw new Error("Method 'apply()' must be implemented."); } }
-class iONOConsole { constructor() { if (this.constructor === iONOConsole) throw new Error("Abstract class 'iONOConsole' cannot be instantiated directly."); } renderOnEnvironment() { throw new Error("Method 'renderOnEnvironment()' must be implemented."); } promptForInput() { throw new Error("Method 'promptForInput()' must be implemented."); } }
+
+class iAction { 
+    constructor() { if (this.constructor === iAction) throw new Error("Abstract class 'iAction' cannot be instantiated directly."); } 
+    apply() { throw new Error("Method 'apply()' must be implemented."); } 
+    toData() { throw new Error("Method 'toData()' must be implemented."); }
+    static fromData(data, context) { throw new Error("Static method 'fromData()' must be implemented."); }
+}
+
+class iONOConsole { 
+    constructor() { if (this.constructor === iONOConsole) throw new Error("Abstract class 'iONOConsole' cannot be instantiated directly."); } 
+    // This method is now removed from the interface
+    // renderOnEnvironment() { throw new Error("Method 'renderOnEnvironment()' must be implemented."); } 
+    getRawPlayerInput(text) { throw new Error("Method 'getRawPlayerInput()' must be implemented."); }
+    parsePlayerInput(rawInput, worldInstance) { throw new Error("Method 'promptForRawInput(text, worldInstance)' must be implemented."); }
+    /**
+     * Buffers a structured game event for later processing.
+     * @param {string} eventName The name of the event (e.g., 'roll', 'effect').
+     * @param {object} data The data associated with the event.
+     */
+    /**
+     * Renders text to the primary player display (e.g., a HUD).
+     * @param {string} text The text to display.
+     */
+    renderOnPlayerHUD(text) { throw new Error("Method 'renderOnPlayerHUD()' must be implemented."); }
+    /**
+     * Takes all buffered HUD text and displays it.
+     */
+    flushPlayerHUD() { throw new Error("Method 'flushPlayerHUD()' must be implemented."); }
+    /**
+     * Buffers a structured game event for later processing.
+     * @param {string} eventName The name of the event (e.g., 'roll', 'effect').
+     * @param {object | string} data The data associated with the event.
+     */
+    bufferEvent(eventName, data) { throw new Error("Method 'bufferEvent()' must be implemented."); }
+    /**
+     * Flushes all buffered events to the environment/main display.
+     */
+    flushEnvironment() { throw new Error("Method 'flushEnvironment()' must be implemented."); }
+    toData() { throw new Error("Method 'toData()' must be implemented."); }
+    static fromData(data) { throw new Error("Static method 'fromData()' must be implemented."); }
+}
+
 class iWorld { 
     constructor() { if (this.constructor === iWorld) throw new Error("Abstract class 'iWorld' cannot be instantiated directly."); }
     getOrCreateEncounter(enemies) { throw new Error("Method 'getOrCreateEncounter()' must be implemented."); }
@@ -30,7 +93,14 @@ class iWorld {
     determineEnemyAction(enemy) { throw new Error("Method 'determineEnemyAction()' must be implemented."); }
     getAllActionsAllowed(player) { throw new Error("Method 'getAllActionsAllowed()' must be implemented."); }
     showPlayerHUD(actionChoices) { throw new Error("Method 'showPlayerHUD()' must be implemented."); }
-    async getPlayerInput() { throw new Error("Method 'getPlayerInput()' must be implemented."); }
+    getPlayerInput(text) { throw new Error("Method 'getPlayerInput(text)' must be implemented."); }
+    /**
+     * Creates and returns the primary player entity for the game.
+     * @returns {Entity} The created player character.
+     */
+    createPlayerCharacter() { throw new Error("Method 'createPlayerCharacter()' must be implemented."); }
+    toData() { throw new Error("Method 'toData()' must be implemented."); }
+    static fromData(data, consoleInstance) { throw new Error("Static method 'fromData()' must be implemented."); }
 }
 // #endregion Interfaces
 
@@ -147,22 +217,43 @@ class ActionPermissionGraphBuilder {
 
 // #endregion Graph Builders
 
-// #region Core Classes
-
 /**
  * Represents the state of a single combat encounter.
  */
 class Encounter {
-    /**
-     * @param {Entity[]} enemies An array of enemy entities.
-     */
     constructor(enemies) {
         this.enemies = enemies;
         this.phase = "__start__";
-        /** @type {Entity[]} An ordered array of all participants for turn tracking. */
         this.turnOrder = [];
-        /** @type {number} The index in turnOrder of the current entity. */
         this.currentTurnIndex = 0;
+    }
+
+    /**
+     * Serializes the encounter's state. References entities by their unique ID.
+     * @returns {object} A serializable object.
+     */
+    toData() {
+        return {
+            phase: this.phase,
+            currentTurnIndex: this.currentTurnIndex,
+            enemies: this.enemies.map(e => e.uid),
+            turnOrder: this.turnOrder.map(e => e.uid),
+        };
+    }
+
+    /**
+     * Deserializes data to create a new Encounter instance.
+     * @param {object} data The plain object to deserialize.
+     * @param {Map<number, Entity>} entityMap A map of UIDs to fully constructed Entity instances.
+     * @returns {Encounter} A new instance of the Encounter.
+     */
+    static fromData(data, entityMap) {
+        const enemies = data.enemies.map(uid => entityMap.get(uid)).filter(Boolean); // Filter out any undefineds
+        const encounter = new Encounter(enemies);
+        encounter.phase = data.phase;
+        encounter.currentTurnIndex = data.currentTurnIndex;
+        encounter.turnOrder = data.turnOrder.map(uid => entityMap.get(uid)).filter(Boolean);
+        return encounter;
     }
 }
 
@@ -172,44 +263,81 @@ class Encounter {
  * @returns {typeof iAttributes} A class that extends iAttributes.
  */
 function createAttributesClass(definedKeys) {
-    return class extends iAttributes {
+    const AttrClass = class extends iAttributes {
         #_keys = [];
         values = {};
         constructor(initialValues = {}) {
             super();
             this.#_keys = [...definedKeys];
             for (const key of this.#_keys) {
-                // For boolean-like attributes, default to false instead of 0
                 this.values[key] = initialValues[key] ?? (typeof initialValues[key] === 'boolean' ? false : 0);
             }
         }
         toArray() { return this.#_keys.map(key => this.values[key]); }
         fromArray(array) {
             this.#_keys.forEach((key, index) => {
-                if (array[index] !== undefined) {
-                    this.values[key] = array[index];
-                }
+                if (array[index] !== undefined) { this.values[key] = array[index]; }
             });
         }
         get(key) { return this.values[key]; }
         set(key, value) { if (this.#_keys.includes(key)) { this.values[key] = value; } }
         keys() { return [...this.#_keys]; }
+        toData() { return { values: this.values }; }
     };
+    
+    /**
+     * @param {object} data The plain object containing 'values'.
+     * @returns {iAttributes} A new instance of this specific Attributes class.
+     */
+    AttrClass.fromData = function(data) {
+        const instance = new this();
+        // Only restore keys that are defined for this class
+        for (const key of instance.keys()) {
+            if (data.values && key in data.values) {
+                instance.set(key, data.values[key]);
+            }
+        }
+        return instance;
+    };
+
+    return AttrClass;
 }
 
 const rollD20 = () => Math.floor(Math.random() * 20) + 1;
+
+
 class Entity {
+    // Static counter to ensure unique IDs within a game session.
+    static nextUid = 0;
+
     constructor({ name, type, description, numAttrs = {}, txtAttrs = {}, NumAttributesClass, TxtAttributesClass }) {
         if (!NumAttributesClass || !TxtAttributesClass) {
             throw new Error("Entity constructor requires both 'NumAttributesClass' and 'TxtAttributesClass'.");
         }
+        this.uid = Entity.nextUid++;
         this.name = name;
         this.type = type;
         this.description = description;
         this.numAttrs = new NumAttributesClass(numAttrs);
         this.txtAttrs = new TxtAttributesClass(txtAttrs);
     }
+    
+    /**
+     * Serializes the entity's state to a plain object.
+     * @returns {object} A serializable object.
+     */
+    toData() {
+        return {
+            uid: this.uid,
+            name: this.name,
+            type: this.type,
+            description: this.description,
+            numAttrs: this.numAttrs.toData(),
+            txtAttrs: this.txtAttrs.toData(),
+        };
+    }
 }
+
 /**
  * Factory to create a specialized Entity class.
  * @param {{type: string, description?: string, NumAttributesClass: typeof iAttributes, TxtAttributesClass: typeof iAttributes}} config
@@ -217,7 +345,8 @@ class Entity {
  */
 function createEntityClass({ type, description, NumAttributesClass, TxtAttributesClass }) {
     if (!type || !NumAttributesClass || !TxtAttributesClass) throw new Error("createEntityClass factory requires 'type', 'NumAttributesClass', and 'TxtAttributesClass'.");
-    return class extends Entity {
+    
+    const NewEntity = class extends Entity {
         constructor(instanceConfig) {
             super({
                 ...instanceConfig,
@@ -228,26 +357,40 @@ function createEntityClass({ type, description, NumAttributesClass, TxtAttribute
             });
         }
     };
+
+    // Attach the attribute classes for deserialization purposes
+    NewEntity.NumAttributesClass = NumAttributesClass;
+    NewEntity.TxtAttributesClass = TxtAttributesClass;
+    
+    /**
+     * Deserializes data to create a new instance of this specific Entity class.
+     * @param {object} data The plain object to deserialize.
+     * @returns {Entity} A new instance.
+     */
+    NewEntity.fromData = function(data) {
+        // Create instance without initial attributes to avoid overhead
+        const instance = new this({ name: data.name, description: data.description });
+        // Restore state and overwrite the default attributes with deserialized ones
+        instance.uid = data.uid;
+        instance.numAttrs = this.NumAttributesClass.fromData(data.numAttrs);
+        instance.txtAttrs = this.TxtAttributesClass.fromData(data.txtAttrs);
+        return instance;
+    };
+
+    return NewEntity;
 }
 
 class Action extends iAction {
     constructor({
-        name, type, description,
-        // allowedActioners and allowedActionees are no longer needed here
-        cost, actionerMod, actioneeMod, effectVal, effectType, effectMask,
-        worldInstance
+        name, type, description, cost, actionerMod, actioneeMod, 
+        effectVal, effectType, effectMask, worldInstance
     }) {
         super();
         this.name = name; this.type = type; this.description = description;
-        // These properties are kept for informational purposes but not used for checks in apply()
-        // this.allowedActioners = allowedActioners; 
-        // this.allowedActionees = allowedActionees;
         this.cost = cost; this.actionerMod = actionerMod; this.actioneeMod = actioneeMod;
         this.effectVal = effectVal; this.effectType = effectType; this.effectMask = effectMask;
         
-        if (!worldInstance) {
-            throw new Error("Action constructor requires 'worldInstance'.");
-        }
+        if (!worldInstance) { throw new Error("Action constructor requires 'worldInstance'."); }
         this.world = worldInstance; 
     }
 
@@ -256,30 +399,27 @@ class Action extends iAction {
     }
 
     apply(actioner, actionee) {
-        this.world.logActionAttempt(actioner, actionee, this);
+        const attemptText = this.world.formatter.format('actionAttempt', { actioner, actionee, action: this });
+        this.world.console.bufferEvent("action", attemptText);
 
-        // --- UPDATED CHECKS ---
-        // 1. A single, powerful check using the new graph-based method.
-        //    It verifies the phase, actioner type, and actionee type all at once.
         if (!this.world.isActionAllowedNow(this, actioner, actionee)) {
-            this.world.logHalt(`Action '${this.name}' is not allowed right now.`);
+            const haltText = this.world.formatter.format('halt', { reason: `Action '${this.name}' is not allowed right now.` });
+            this.world.console.bufferEvent("info", haltText);
             return { outcome: "not_allowed" };
         }
-
-        // 2. The affordability check remains.
         if (!this._canAfford(actioner)) {
-            this.world.logHalt("Cannot afford cost.");
+            const haltText = this.world.formatter.format('halt', { reason: "Cannot afford cost." });
+            this.world.console.bufferEvent("info", haltText);
             return { outcome: "cannot_afford" };
         }
-        // --- END OF UPDATED CHECKS ---
 
-        // 1. Pay cost
         for (const key of this.cost.keys()) {
             const costValue = this.cost.get(key);
             if (costValue > 0) {
                 const newValue = actioner.numAttrs.get(key) - costValue;
                 actioner.numAttrs.set(key, newValue);
-                this.world.logCost(actioner, key, costValue, newValue);
+                const costText = this.world.formatter.format('costPaid', { entity: actioner, resourceName: key, cost: costValue, newValue });
+                this.world.console.bufferEvent("battle", costText);
             }
         }
 
@@ -289,7 +429,9 @@ class Action extends iAction {
         const resultValue = (actionerRoll + actionerModValue) - (actioneeRoll + actioneeModValue);
         let outcome;
         if (resultValue < -12) outcome = "critical failure"; else if (resultValue < 0) outcome = "failure"; else if (resultValue < 11) outcome = "success"; else if (resultValue >= 11) outcome = "critical success";
-        this.world.logRoll({ actioner, actionerRoll, actionerModValue, actionee, actioneeRoll, actioneeModValue, resultValue, outcome });
+        
+        const rollText = this.world.formatter.format('rollResult', { actioner, actionerRoll, actionerModValue, actionee, actioneeRoll, actioneeModValue, resultValue, outcome });
+        this.world.console.bufferEvent("info", rollText);
 
         if (outcome === "success" || outcome === "critical success") {
             for (const key of this.effectMask.keys()) {
@@ -302,36 +444,92 @@ class Action extends iAction {
                         newValue = originalValue + effectAmount;
                     }
                     actionee.numAttrs.set(key, newValue);
-                    this.world.logEffect(actionee, key, originalValue, newValue, outcome === "critical success" ? " (Critical Bonus!)" : "");
+                    
+                    const effectText = this.world.formatter.format('effectApplied', { entity: actionee, key, originalValue, newValue, bonusText: outcome === "critical success" ? " (Critical Bonus!)" : "" });
+                    this.world.console.bufferEvent("battle", effectText);
                 }
             }
         } else if (outcome === "critical failure") {
-            this.world.logPenalty(actioner, "pays cost again due to critical failure.");
+            const penaltyText = this.world.formatter.format('penalty', { entity: actioner, reason: "pays cost again due to critical failure." });
+            this.world.console.bufferEvent("battle", penaltyText);
+            
             for (const key of this.cost.keys()) {
                 if (this.cost.get(key) > 0) {
-                    const newValue = Math.max(0, actioner.numAttrs.get(key) - this.cost.get(key));
-                    actioner.numAttrs.set(key, newValue); this.world.logCost(actioner, key, this.cost.get(key), newValue);
+                    const costAgain = this.cost.get(key)
+                    const newValue = Math.max(0, actioner.numAttrs.get(key) - costAgain);
+                    actioner.numAttrs.set(key, newValue); 
+                    const costText = this.world.formatter.format('costPaid', { entity: actioner, resourceName: key, cost: costAgain, newValue });
+                    this.world.console.bufferEvent("battle", costText);
                 }
             }
-        } else { this.world.logNoEffect(outcome); }
+        } else {
+            const noEffectText = this.world.formatter.format('noEffect', { outcome });
+            this.world.console.bufferEvent("battle", noEffectText);
+        }
         
         return { outcome, resultValue };
+    }
+
+    /**
+     * Serializes the action's configuration. Excludes the circular 'world' reference.
+     * @returns {object} A serializable object.
+     */
+    toData() {
+        return {
+            name: this.name, type: this.type, description: this.description,
+            cost: this.cost.toData(),
+            actionerMod: this.actionerMod.toData(),
+            actioneeMod: this.actioneeMod.toData(),
+            effectVal: this.effectVal.toData(),
+            effectType: this.effectType,
+            effectMask: this.effectMask.toData(),
+        };
     }
 }
 
 /**
  * Factory to create a specialized Action class.
- * @param {{name: string, type: string, description: string, allowedActioners: (typeof Entity)[], allowedActionees: (typeof Entity)[], cost: iAttributes, actionerMod: iAttributes, actioneeMod: iAttributes, effectVal: iAttributes, effectType: string, effectMask: iAttributes}} config
+ * @param {object} config - The action configuration.
  * @returns {typeof Action} A class that extends Action.
  */
 function createActionClass(config) {
-    return class extends Action {
+    const NewAction = class extends Action {
         constructor({ worldInstance }) {
             super({ ...config, worldInstance });
         }
     };
-}
+    
+    /**
+     * Statically attach the config for easy access without instantiation. This is
+     * crucial for avoiding serialization errors in environments like AI Dungeon,
+     * as it allows us to read action properties (like name) without creating
+     * a full, non-serializable instance.
+     */
+    NewAction.config = config;
+    /**
+     * Deserializes data to create a new Action instance.
+     * Note: Actions are typically stateless definitions. It's often easier to 
+     * re-instantiate them from the rulebook (`new world.Actions.ActionName(...)`).
+     * This method is provided for completeness.
+     * @param {object} data The plain object to deserialize.
+     * @param {{worldInstance: iWorld}} context Requires the world instance.
+     * @returns {Action} A new instance of this Action class.
+     */
+    NewAction.fromData = function(data, { worldInstance }) {
+        // Re-create the config for the constructor by deserializing attribute data
+        const newConfig = {
+            ...data,
+            cost: config.cost.constructor.fromData(data.cost),
+            actionerMod: config.actionerMod.constructor.fromData(data.actionerMod),
+            actioneeMod: config.actioneeMod.constructor.fromData(data.actioneeMod),
+            effectVal: config.effectVal.constructor.fromData(data.effectVal),
+            effectMask: config.effectMask.constructor.fromData(data.effectMask),
+        };
+        return new NewAction({ ...newConfig, worldInstance });
+    };
 
+    return NewAction;
+}
 
 module.exports = { 
     iAttributes, iWorld, iONOConsole, iAction, 

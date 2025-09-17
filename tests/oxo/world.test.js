@@ -15,12 +15,12 @@ describe('World (OXO Rulebook)', () => {
     let orc;
 
     // Before each test, create a fresh instance of the world
-    beforeEach(async () => {
+    beforeEach(() => {
         // Reset the singleton instance for isolation between tests
         World.instance = null; 
         World.initialize(mockConsole);
         worldInstance = World.getInstance();
-        player = await worldInstance.createPlayerCharacter();
+        player = worldInstance.createPlayerCharacter();
         orc = new worldInstance.Entities.Orc({ name: 'Grimgor', numAttrs: { hp: 60 } });
         // Clear mocks from previous tests
         jest.clearAllMocks();

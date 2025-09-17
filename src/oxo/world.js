@@ -4,56 +4,111 @@
  * @implements {import('../core.js').iWorld}
  */
 
-const { createAttributesClass, createEntityClass, createActionClass, EncounterPhaseTransitionBuilder, ActionPermissionGraphBuilder, Encounter } = require('../core.js');
+const { createAttributesClass, createEntityClass, createActionClass, EncounterPhaseTransitionBuilder, ActionPermissionGraphBuilder, Encounter, Entity } = require('../core.js');
 
-// --- RULEBOOK DEFINITIONS ---
+/**
+ * The introductory plot text for the game.
+ * @type {string}
+ */
+const plotEssentials = `
+You are a heroic adventurer in a fantasy world filled with danger and excitement. 
+Your journey begins in a small village, but soon you will face fierce orcs, cunning elves, and other mythical creatures. 
+Use your strength and wits to survive and thrive in this perilous land.
+`;
 
-// 1. Attribute Structures
+/**
+ * Instructions for the AI on how to write.
+ * @type {string}
+ */
+const authorsNote = `
+Write in a descriptive and engaging style, focusing on the action and the environment.
+`;
+
+/**
+ * Core statistical attributes for entities.
+ * @type {Attributes}
+ */
 const CoreStats = createAttributesClass(['hp', 'mp', 'strength', 'defense']);
+
+/**
+ * Status effect attributes for entities.
+ * @type {Attributes}
+ */
 const StatusEffects = createAttributesClass(['poisoned', 'stunned', 'burning']);
 
-// 2. Entity Classes
+/**
+ * The player character entity class.
+ * @type {Entity}
+ */
 const Player = createEntityClass({ type: 'Player', NumAttributesClass: CoreStats, TxtAttributesClass: StatusEffects });
+
+/**
+ * The Orc entity class.
+ * @type {Entity}
+ */
 const Orc = createEntityClass({ type: 'Orc', NumAttributesClass: CoreStats, TxtAttributesClass: StatusEffects });
+
+/**
+ * The Elf entity class.
+ * @type {Entity}
+ */
 const Elf = createEntityClass({ type: 'Elf', NumAttributesClass: CoreStats, TxtAttributesClass: StatusEffects });
 
-// 3. Action Classes
+/**
+ * A powerful melee attack.
+ * @type {Action}
+ */
 const HeavyStrike = createActionClass({
     name: "Heavy Strike", type: "Attack", allowedActioners: [Player, Orc], allowedActionees: [Player, Orc, Elf],
-    cost: new CoreStats({ mp: 10 }), actionerMod: new CoreStats({ strength: 0.5 }),
-    actioneeMod: new CoreStats({ defense: 0.2 }), effectVal: new CoreStats({ hp: -25 }),
+    cost: new CoreStats({ mp: 1 }), actionerMod: new CoreStats({ strength: 0.5 }),
+    actioneeMod: new CoreStats({ defense: 0.2 }), effectVal: new CoreStats({ hp: -2 }),
     effectType: "add", effectMask: new CoreStats({ hp: true }),
 });
-const BasicAttack = createActionClass({ // A simple attack for Orcs
+
+/**
+ * A basic melee attack.
+ * @type {Action}
+ */
+const BasicAttack = createActionClass({ 
     name: "Basic Attack", type: "Attack", allowedActioners: [Orc], allowedActionees: [Player],
     cost: new CoreStats({}), actionerMod: new CoreStats({ strength: 0.3 }),
-    actioneeMod: new CoreStats({ defense: 0.3 }), effectVal: new CoreStats({ hp: -10 }),
+    actioneeMod: new CoreStats({ defense: 0.3 }), effectVal: new CoreStats({ hp: -1 }),
     effectType: "add", effectMask: new CoreStats({ hp: true }),
 });
 
-
-// --- GRAPH CONSTRUCTION (REFACTORED) ---
-
-// 4. Phase Transition Graph - Simplified to manage states, not turns.
+/**
+ * The phase transition graph for encounters.
+ * @type {EncounterPhaseTransitionBuilder}
+ */
 const phaseGraph = new EncounterPhaseTransitionBuilder()
     .addPhase('combat')
-    .addTransition('__start__', 'combat', () => true) // Always start in combat
-    .addTransition('combat', '__end__', (world) => world.isPlayerDefeated() || world.areAllEnemiesDefeated()) // After every action, check for victory
+    .addTransition('__start__', 'combat', () => true) 
+    .addTransition('combat', '__end__', (world) => world.isPlayerDefeated() || world.areAllEnemiesDefeated()) 
     .build();
 
-// 5. Action Permission Graph - Uses the new 'combat' phase.
+/**
+ * The action permission graph for the game.
+ * @type {ActionPermissionGraphBuilder}
+ */
 const permissionGraph = new ActionPermissionGraphBuilder()
     .addPermission(Player, Orc, 'combat', HeavyStrike)
     .addPermission(Orc, Player, 'combat', BasicAttack)
     .build();
 
-
-// --- WORLD SINGLETON IMPLEMENTATION ---
-
+/**
+ * The main World class, implemented as a singleton.
+ * @implements {iWorld}
+ */
 class World {
-    constructor(consoleInstance) {
+    /**
+     * @param {iONOConsole} consoleInstance - The console instance for I/O.
+     * @param {EventFormatter} formatterInstance - The event formatter instance.
+     */
+    constructor(consoleInstance, formatterInstance) {
         if (!consoleInstance) throw new Error("World requires a console instance.");
+        if (!formatterInstance) throw new Error("World requires a formatter instance.");
         this.console = consoleInstance;
+        this.formatter = formatterInstance; 
         this.player = null;
         this.currentEncounter = null;
         this.phaseGraph = phaseGraph;
@@ -62,41 +117,44 @@ class World {
         this.Actions = { HeavyStrike, BasicAttack };
     }
 
-    // --- State Check Helpers ---
+    /**
+     * Checks if the player is defeated.
+     * @returns {boolean} True if the player's HP is 0 or less.
+     */
     isPlayerDefeated() { return this.player && this.player.numAttrs.get('hp') <= 0; }
-    areAllEnemiesDefeated() { return this.currentEncounter && this.currentEncounter.enemies.every(e => e.numAttrs.get('hp') <= 0); }
-    
-    // --- `iWorld` Methods ---
 
     /**
-     * Gets the current encounter or creates a new one, including turn order.
-     * @param {import('../core.js').Entity[]} enemies An array of enemy entities for the new encounter.
-     * @returns {Encounter} The active encounter.
+     * Checks if all enemies in the current encounter are defeated.
+     * @returns {boolean} True if all enemies have 0 or less HP.
+     */
+    areAllEnemiesDefeated() { return this.currentEncounter && this.currentEncounter.enemies.every(e => e.numAttrs.get('hp') <= 0); }
+    
+    /**
+     * Gets the current encounter or creates a new one.
+     * @param {Entity[]} enemies - The enemies in the encounter.
+     * @returns {Encounter} The current or new encounter.
      */
     getOrCreateEncounter(enemies) {
         if (!this.player) throw new Error("Player must be created before an encounter can start.");
         if (!this.currentEncounter) {
-            this.console.renderOnEnvironment("\n--- Encounter begins! ---");
-            this.currentEncounter = new Encounter(enemies);
+            this.console.bufferEvent('plot', this.formatter.format('encounterStart'));
 
-            // --- NEW: Turn Order Logic ---
+            this.currentEncounter = new Encounter(enemies);
             const allParticipants = [this.player, ...enemies];
-            // Simple random shuffle to determine turn order
             this.currentEncounter.turnOrder = allParticipants
                 .map(value => ({ value, sort: Math.random() }))
                 .sort((a, b) => a.sort - b.sort)
                 .map(({ value }) => value);
-            
             this.currentEncounter.currentTurnIndex = 0;
-            const turnOrderNames = this.currentEncounter.turnOrder.map(p => p.name).join(', ');
-            this.console.renderOnEnvironment(`Turn order determined: ${turnOrderNames}`);
-            this.console.renderOnEnvironment(`\n--- It's now ${this.getEntityForThisTurn().name}'s turn. ---`);
+            
+            const turnText = this.formatter.format('turnStart', { entity: this.getEntityForThisTurn() });
+            this.console.bufferEvent("battle", turnText);
         }
         return this.currentEncounter;
     }
     
     /**
-     * Advances the encounter to the next phase based on the transition graph.
+     * Updates the encounter phase based on the phase graph.
      */
     updateEncounterPhase() {
         if (!this.currentEncounter) return;
@@ -105,10 +163,13 @@ class World {
         for (const edge of possibleTransitions) {
             if (edge.condition(this)) {
                 this.currentEncounter.phase = edge.to;
-                this.console.renderOnEnvironment(`-- Phase changed: ${currentPhase} -> ${edge.to} --`);
+                
+                this.console.bufferEvent('critical', `phase changed from: ${currentPhase}, to: ${edge.to}`);
+                
                 if (edge.to === '__end__') {
                     const playerWon = this.areAllEnemiesDefeated();
-                    this.console.renderOnEnvironment(`--- Encounter ended. ${playerWon ? "Victory!" : "Defeat."} ---`);
+                    const endText = this.formatter.format('encounterEnd', { playerWon });
+                    this.console.bufferEvent('critical', endText);
                     this.currentEncounter = null;
                 }
                 return;
@@ -117,7 +178,11 @@ class World {
     }
 
     /**
-     * Checks if an action is allowed by querying the permission graph.
+     * Checks if an action is allowed in the current context.
+     * @param {Action} action - The action to check.
+     * @param {Entity} actioner - The entity performing the action.
+     * @param {Entity} actionee - The entity receiving the action.
+     * @returns {boolean} True if the action is allowed.
      */
     isActionAllowedNow(action, actioner, actionee) {
         if (!this.currentEncounter || !actioner || !actionee) return false;
@@ -129,151 +194,223 @@ class World {
         return !!(specificEdge && specificEdge.actions.has(action.constructor));
     }
 
-    // --- NEW: Turn Management Methods ---
-
+    /**
+     * Checks if it is the player's turn.
+     * @returns {boolean} True if it is the player's turn.
+     */
     isPlayerTurn() {
         if (!this.currentEncounter) return false;
         return this.getEntityForThisTurn() === this.player;
     }
 
-    updateTurn() {
-        if (!this.currentEncounter) return;
-        const nextIndex = (this.currentEncounter.currentTurnIndex + 1) % this.currentEncounter.turnOrder.length;
-        this.currentEncounter.currentTurnIndex = nextIndex;
-        const nextEntity = this.getEntityForThisTurn();
-        this.console.renderOnEnvironment(`\n--- It's now ${nextEntity.name}'s turn. ---`);
-    }
-
-    getEntityForThisTurn() {
-        if (!this.currentEncounter) return null;
-        return this.currentEncounter.turnOrder[this.currentEncounter.currentTurnIndex];
-    }
-
+    /**
+     * Determines the enemy's action for the current turn.
+     * @param {Entity} enemy - The enemy entity.
+     * @returns {Action|null} The action the enemy will perform, or null if no action is possible.
+     */
     determineEnemyAction(enemy) {
-        // Simple AI: always use BasicAttack on the player if possible.
+        
         if (enemy.type === 'Orc') {
             const attackAction = new this.Actions.BasicAttack({ worldInstance: this });
             if (this.isActionAllowedNow(attackAction, enemy, this.player)) {
                 return attackAction;
             }
         }
-        return null; // No valid action found
+        return null; 
     }
 
-    async getPlayerInput() {
-        // In a real game, this would process actual user commands.
-        // For this demo, we auto-select the first available action.
+    /**
+     * Gets the player's input.
+     * @returns {string} The player's chosen action.
+     */
+    getPlayerInput() {
+        
+        
         const choices = this.getAllActionsAllowed(this.player);
-        const choiceNames = choices.map(a => a.name.replace(' ', ''));
-        this.console.renderOnEnvironment(`(Auto-selecting '${choiceNames[0]}' for demo purposes.)`);
-        return choiceNames.length > 0 ? choiceNames[0] : null;
+        const choiceNames = choices.map(a => a.actionName.replace(' ', ''));
+        let playerChoice = choiceNames[0]; 
+        this.console.bufferEvent("action", `Player selected '${playerChoice}'`);
+        return playerChoice;
     }
 
+    /**
+     * Gets all actions allowed for the player in the current context.
+     * @param {Entity} player - The player entity.
+     * @returns {{actionName: string, targetIndex: number}[]} A list of allowed moves.
+     */
     getAllActionsAllowed(player) {
         if (!this.currentEncounter) return [];
-        const allowed = [];
-        const potentialTargets = this.currentEncounter.enemies.filter(e => e.numAttrs.get('hp') > 0);
-        for (const ActionClass of Object.values(this.Actions)) {
-            const actionInstance = new ActionClass({ worldInstance: this });
+        const allowedMoves = [];
+        
+        
+        const potentialTargets = this.currentEncounter.enemies
+            .map((enemy, index) => ({ entity: enemy, index }))
+            .filter(target => target.entity.numAttrs.get('hp') > 0);
+
+        
+        
+        for (const [actionKey, ActionClass] of Object.entries(this.Actions)) {
+            
+            
+            
+            const dummyAction = { constructor: ActionClass };
+
             for (const target of potentialTargets) {
-                 if(this.isActionAllowedNow(actionInstance, player, target)) {
-                     allowed.push(actionInstance);
-                     break; 
-                 }
+                if (this.isActionAllowedNow(dummyAction, player, target.entity)) {
+                    allowedMoves.push({
+                        actionName: actionKey, 
+                        targetIndex: target.index
+                    });
+                }
             }
         }
-        return allowed;
+        return allowedMoves;
     }
 
-    showPlayerHUD(actionChoices) {
-        this.console.flushPlayerHUD();
-        this.console.renderOnPlayerHUD("Your turn! Available Actions:");
-        if (actionChoices.length === 0) {
-            this.console.renderOnPlayerHUD("- None");
-        } else {
-            actionChoices.forEach(action => {
-                this.console.renderOnPlayerHUD(`- ${action.name} (Cost: ${action.cost.get('mp')} MP)`);
+    /**
+     * Shows the player HUD with available actions.
+     * @param {{actionName: string, targetIndex: number}[]} allowedMoves - The list of allowed moves.
+     */
+    showPlayerHUD(allowedMoves) {
+        if (allowedMoves.length > 0) {
+            allowedMoves.forEach(move => {
+                const command = `#${move.actionName}_${move.targetIndex}`;
+                this.console.renderOnPlayerHUD(command);
             });
         }
     }
 
     /**
-     * Initializes the singleton instance of the World. This must be called before getInstance.
-     * @param {import('../core.js').iONOConsole} consoleInstance
+     * Updates the turn to the next entity in the turn order.
      */
-    static initialize(consoleInstance) {
+    updateTurn() {
+        if (!this.currentEncounter) return;
+        const nextIndex = (this.currentEncounter.currentTurnIndex + 1) % this.currentEncounter.turnOrder.length;
+        this.currentEncounter.currentTurnIndex = nextIndex;
+        const nextEntity = this.getEntityForThisTurn();
+
+        const turnText = this.formatter.format('turnStart', { entity: nextEntity });
+        this.console.bufferEvent('battle', turnText);
+    }
+
+    /**
+     * Gets the entity whose turn it is.
+     * @returns {Entity|null} The current entity, or null if not in an encounter.
+     */
+    getEntityForThisTurn() {
+        if (!this.currentEncounter) return null;
+        return this.currentEncounter.turnOrder[this.currentEncounter.currentTurnIndex];
+    }
+
+    /**
+     * Initializes the World singleton.
+     * @param {iONOConsole} consoleInstance - The console instance.
+     * @param {EventFormatter} formatterInstance - The event formatter instance.
+     */
+    static initialize(consoleInstance, formatterInstance) {
         if (!World.instance) {
-            World.instance = new World(consoleInstance);
+            World.instance = new World(consoleInstance, formatterInstance);
+            consoleInstance.plotEssentials = plotEssentials;
+            consoleInstance.authorsNote = authorsNote;
         }
     }
 
     /**
-     * Gets the singleton instance. Throws an error if not initialized.
-     * @returns {World}
+     * Gets the World singleton instance.
+     * @returns {World} The World instance.
      */
     static getInstance() {
         if (!World.instance) {
-            throw new Error("World singleton has not been initialized. Call World.initialize(consoleInstance) first.");
+            throw new Error("World singleton has not been initialized. Call World.initialize(...) first.");
         }
+        World.instance.console.plotEssentials = plotEssentials;
+        World.instance.console.authorsNote = authorsNote;
         return World.instance;
+    }
+    
+    /**
+     * Creates the player character.
+     * @returns {Entity} The created player character.
+     */
+    createPlayerCharacter() {
+        const playerName = this.console.getRawPlayerInput("Hero");
+        this.player = new this.Entities.Player({
+            name: playerName,
+            numAttrs: { hp: 100, mp: 50, strength: 20, defense: 10 },
+        });
+
+        return this.player;
     }
 
     /**
-     * Creates the player character based on user input.
-     * @returns {Promise<Player>} A promise that resolves with the created player entity.
+     * Serializes the world state to a data object.
+     * @returns {object|null} The serialized world state, or null if the player doesn't exist.
      */
-    async createPlayerCharacter() {
-        const playerName = await this.console.promptForInput("Enter your hero's name:");
-        const player = new this.Entities.Player({
-            name: playerName,
-            numAttrs: { hp: 100, mp: 50, strength: 20, defense: 10 },
-            txtAttrs: { poisoned: false, stunned: false, burning: false }
-        });
-        this.console.renderOnEnvironment(`A new hero is born: ${playerName}!`);
-        return player;
+    toData() {
+        if (!this.player) return null; 
+
+        
+        const allEntities = new Map();
+        allEntities.set(this.player.uid, this.player);
+        if (this.currentEncounter) {
+            this.currentEncounter.enemies.forEach(enemy => allEntities.set(enemy.uid, enemy));
+        }
+
+        return {
+            
+            entities: Array.from(allEntities.values()).map(e => e.toData()),
+            
+            playerUid: this.player.uid,
+            
+            encounter: this.currentEncounter ? this.currentEncounter.toData() : null,
+            
+            nextUid: Entity.nextUid
+        };
     }
 
+    /**
+     * Creates a World instance from serialized data.
+     * @param {object} data - The serialized world data.
+     * @param {iONOConsole} consoleInstance - The console instance.
+     * @param {EventFormatter} formatterInstance - The event formatter instance.
+     * @returns {World} The rehydrated World instance.
+     */
+    static fromData(data, consoleInstance, formatterInstance) {
+        World.initialize(consoleInstance, formatterInstance);
+        const world = World.getInstance();
+        
+        if (!data) return world;
 
-    // --- Event Interpretation & Logging Methods ---
-    logActionAttempt(actioner, actionee, action) {
-        this.console.renderOnEnvironment(`\n🎬 ${actioner.name} attempts '${action.name}' on ${actionee.name}.`);
-    }
+        
+        Entity.nextUid = data.nextUid || 0;
 
-    logCost(entity, resourceName, cost, newValue) {
-        this.console.renderOnEnvironment(`  💸 ${entity.name} pays ${cost} ${resourceName}. New value: ${newValue}`);
-    }
-    
-    logRoll(details) {
-        const { actioner, actionerRoll, actionerModValue, actionee, actioneeRoll, actioneeModValue, resultValue, outcome } = details;
-        this.console.renderOnEnvironment(`  🎲 Roll: ${actioner.name} (${actionerRoll}) vs ${actionee.name} (${actioneeRoll}). Mods: ${actionerModValue.toFixed(2)} vs ${actioneeModValue.toFixed(2)}. Final Value: ${resultValue.toFixed(2)} -> ${outcome.toUpperCase()}`);
-    }
-    
-    logEffect(entity, key, originalValue, newValue, bonusText = "") {
-        this.console.renderOnEnvironment(`  ✨ Effect on ${entity.name}: ${key} changed from ${originalValue} to ${newValue}.${bonusText}`);
-    }
-
-    logNoEffect(outcome) {
-        this.console.renderOnEnvironment(`  🤷 Action resulted in ${outcome}. No effect applied.`);
-    }
-
-    logPenalty(entity, reason) {
-        this.console.renderOnEnvironment(`  ❗ Penalty for ${entity.name}: ${reason}`);
-    }
-    
-    logHalt(reason) {
-        this.console.renderOnEnvironment(`  🛑 HALT: ${reason}`);
+        const entityMap = new Map();
+        if (data.entities) {
+            for (const entityData of data.entities) {
+                
+                const EntityClass = world.Entities[entityData.type];
+                if (EntityClass) {
+                    const entity = EntityClass.fromData(entityData);
+                    entityMap.set(entity.uid, entity);
+                } else {
+                    console.warn(`Could not find Entity class for type: ${entityData.type}`);
+                }
+            }
+        }
+        
+        
+        world.player = entityMap.get(data.playerUid);
+        
+        
+        if (data.encounter) {
+            world.currentEncounter = Encounter.fromData(data.encounter, entityMap);
+        } else {
+            world.currentEncounter = null;
+        }
+        
+        
+        return world;
     }
 }
 
-// Update createPlayerCharacter to store the player in the world instance
-World.prototype.createPlayerCharacter = async function() {
-    const playerName = await this.console.promptForInput("Enter your hero's name:");
-    this.player = new this.Entities.Player({
-        name: playerName,
-        numAttrs: { hp: 100, mp: 50, strength: 20, defense: 10 },
-    });
-    this.console.renderOnEnvironment(`A new hero is born: ${this.player.name}!`);
-    return this.player;
-};
-
-module.exports = { World };
+module.exports = { World, plotEssentials, authorsNote };

@@ -1,69 +1,111 @@
-/**
- * @file O&O Console (Presentation Layer)
- * @description A singleton class to handle all raw text output for the game.
- * It is a "dumb" renderer, unaware of the game's logic or state.
- * @implements {import('../core.js').iONOConsole}
- */
 class ONOConsole {
     constructor() {
-        if (ONOConsole.instance) {
-            return ONOConsole.instance;
-        }
+        if (ONOConsole.instance) { return ONOConsole.instance; }
+        
+        this.hudTextParts = [];
+        this.bufferedEvents = [];
+        this.plotEssentials = "";
+        this.authorsNote = "";
+
         ONOConsole.instance = this;
     }
 
-    /**
-     * The static method that controls access to the singleton instance.
-     * @returns {ONOConsole} The single instance of the ONOConsole class.
-     */
     static getInstance() {
-        if (!ONOConsole.instance) {
-            ONOConsole.instance = new ONOConsole();
-        }
+        if (!ONOConsole.instance) { ONOConsole.instance = new ONOConsole(); } 
         return ONOConsole.instance;
     }
 
-    /**
-     * Renders text to the primary player display (e.g., a HUD or main text box).
-     * @param {string} text The text to display.
-     */
     renderOnPlayerHUD(text) {
-        console.log(`[HUD] ${text}`);
+        this.hudTextParts.push(text);
     }
 
-    /**
-     * Renders text to the secondary display (e.g., the general environment log).
-     * @param {string} text The text to display.
-     */
-    renderOnEnvironment(text) {
-        console.log(`[ENV] ${text}`);
-    }
-
-    /**
-     * Prompts the user for input and returns the result.
-     * @param {string} question - The question to ask the user.
-     * @returns {Promise<string>} A promise that resolves with the user's input.
-     */
-    promptForInput(question) {
-        // In a real terminal app, this would use process.stdin and readline.
-        // For this example, we'll log the question and return a default name.
-        console.log(`[INPUT] ${question}`);
-        return Promise.resolve('Hero'); // Returning a default name for non-interactive execution
+    flushPlayerHUD() {
+        if (this.hudTextParts.length === 0) return "";
+        const text = `You can take these actions: ${this.hudTextParts.join(', ')}.`;
+        this.hudTextParts = []; 
+        return `(((${text})))`;
     }
     
-    /**
-     * Clears the player HUD.
-     */
-    flushPlayerHUD() {
-        console.log('[HUD] --- CLEARED ---');
+    flushEnvironment() {
+        let frontMemory = "";
+        let authorsNote = this.authorsNote;
+        let context = this.plotEssentials;
+        let message = "";
+
+        for (const event of this.bufferedEvents) {
+            const { name, data } = event;
+            switch(name) {
+                case 'action': 
+                    frontMemory += `\n${data}`;
+                    break;
+                case 'critical': 
+                    message += `\n${data}`;
+                    break;
+                case 'battle': 
+                    authorsNote += `\n${data}`;
+                    break;
+                case "plot": 
+                default:
+                    context += `\n${data}`;
+                    break;
+                
+            }
+        }
+                
+        state.context = context.trim();
+        state.frontMemory = frontMemory.trim();
+        state.authorsNote = authorsNote.trim();
+        state._message = message.trim();
+        
+        this.bufferedEvents = [];
     }
 
-    /**
-     * Clears the environment log.
-     */
-    flushEnvironment() {
-        console.log('[ENV] --- CLEARED ---');
+    getRawPlayerInput(text) {
+        return text; 
     }
+
+    parsePlayerInput(rawPlayerInput, world) {
+        
+        const commandRegex = /#([a-zA-Z0-9_]+)/;
+        const match = rawPlayerInput.match(commandRegex);
+        if (!match) {
+            return ""; 
+        }
+        let playerCommand = match[1]; 
+
+        const allowedMoves = world.getAllActionsAllowed(world.player);
+        
+        const validCommands = new Set();
+        allowedMoves.forEach(move => {
+            validCommands.add(`${move.actionName}_${move.targetIndex}`);
+        });
+        
+        if (!playerCommand.includes('_')) {
+            const defaultCommand = `${playerCommand}_0`;
+            
+            if (validCommands.has(defaultCommand)) {
+                playerCommand = defaultCommand;
+            }
+        }
+
+        if (validCommands.has(playerCommand)) {
+            console.log(`Player command recognized: ${playerCommand}`);
+            return playerCommand;
+        } else {
+            return ""; 
+        }
+    }
+
+    
+
+    bufferEvent(eventName, data) {
+        this.bufferedEvents.push({ name: eventName, data });
+    }
+
+   
+    
+    toData() { return {}; }
+    static fromData(data) { return ONOConsole.getInstance(); }
 }
 
 module.exports = { ONOConsole };
