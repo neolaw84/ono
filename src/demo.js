@@ -1,99 +1,92 @@
 /**
  * @file Game Entry Point
- * @description This file demonstrates how to dynamically load a rulebook and run a turn-based encounter.
+ * @description Demonstrates the new architecture with dependency injection.
  */
 
-const rulebookName = 'ono';
-const systemName = 'cli';
+const rulebookName = "ono";
+const systemName = "cli";
+
+// --- Imports ---
+const { World } = require("./core/world.js"); // Import the new core World
+const { GamePhaseManager } = require(`./${rulebookName}/game_phase_manager.js`);
+const { EventFormatter } = require(`./${rulebookName}/event_formatter.js`);
+const { ONOConsole } = require(`./${systemName}/ono_console.js`);
 
 function setupGame() {
-    try {
-        // 1. Synchronously load modules
-        const { World } = require(`./${rulebookName}/world.js`);
-        const { EventFormatter } = require(`./${rulebookName}/event_formatter.js`);
-        const { ONOConsole } = require(`./${systemName}/ono_console.js`);
+  try {
+    // 1. Instantiate all dependencies
+    const onoConsole = ONOConsole.getInstance();
+    const formatter = new EventFormatter();
+    const gamePhaseManager = new GamePhaseManager();
 
-        // 2. Initialize Singletons and Formatter
-        const onoConsoleInstance = ONOConsole.getInstance();
-        const formatter = new EventFormatter();
-        World.initialize(onoConsoleInstance, formatter); // Inject formatter
-        const worldInstance = World.getInstance();
-        
-        console.log(`Successfully loaded modules from rulebook '${rulebookName}' and system '${systemName}'`);
+    // 2. Initialize the World singleton with its dependencies
+    const world = World.getInstance();
+    world.initialize(onoConsole, formatter, gamePhaseManager);
 
-        // 3. Create Characters
-        const player = worldInstance.createPlayerCharacter();
-        const orc = new worldInstance.Entities.Orc({ name: 'Grimgor', numAttrs: { hp: 60, strength: 15, defense: 5 } });
+    console.log(`Successfully loaded modules and initialized World.`);
 
-        // 4. Start Encounter
-        worldInstance.getOrCreateEncounter([orc]);
-        // Initial phase transition from __start__ to combat
-        worldInstance.updateEncounterPhase(); 
+    // 3. Create Player and start the game
+    const player = world.createPlayerCharacter({
+      name: "Hero",
+      numAttrs: { hp: 100, mp: 50, strength: 20, defense: 10 },
+    });
 
-        // 5. Run the REFACTORED Game Loop
-        console.log("\n--- Starting Battle Loop ---");
-        
-        let hudShown = false;
+    // The world starts in '__start__'. Let's transition to the combat phase.
+    world.updateGamePhase();
 
-        while (worldInstance.currentEncounter && worldInstance.currentEncounter.phase !== '__end__') {
-            const currentEntity = worldInstance.getEntityForThisTurn();
+    // 4. Start a new encounter based on the current game phase
+    world.startNewEncounter();
 
-            if (worldInstance.isPlayerTurn()) {
-                if (!hudShown) {
-                    worldInstance.showPlayerHUD(worldInstance.getAllActionsAllowed(player));
-                    hudShown = true;
-                }
-                const rawPlayerInput = onoConsoleInstance.getRawPlayerInput("whatever");
-                const playerInput = onoConsoleInstance.parsePlayerInput(rawPlayerInput, worldInstance); 
-                
-                if (playerInput) {
-                    const [actionName, targetIndexStr] = playerInput.split('_');
-                    const targetIndex = targetIndexStr ? parseInt(targetIndexStr, 10) : 0;
+    // 5. Game Loop
+    console.log("\n--- Starting Battle Loop ---");
+    while (world.currentEncounter) {
+      const currentEntity = world.getEntityForThisTurn();
 
-                    const allActionKeys = Object.keys(worldInstance.Actions);
-                    
-                    const actionKey = Object.keys(worldInstance.Actions).find(key => key.toLowerCase() === actionName.toLowerCase());
-                    const ActionClass = actionKey ? worldInstance.Actions[actionKey] : undefined;
-                    console.log("Resolved ActionClass:", ActionClass ? ActionClass.name : 'Not Found');
-                    const livingEnemies = worldInstance.currentEncounter.enemies.filter(e => e.numAttrs.get('hp') > 0);
-                    const actionee = livingEnemies[targetIndex];
+      if (currentEntity === player) {
+        // Player's turn
+        world.showPlayerHUD(world.getAllActionsAllowed(player));
 
-                    if (ActionClass && actionee) {
-                        const action = new ActionClass({ worldInstance });
-                        action.apply(player, actionee);
-                    }
-                } else {
-                    onoConsoleInstance.renderOnEnvironment(`${player.name} has no available actions.`);
-                }
-                
-            } else { // Enemy's turn
-                const enemy = currentEntity;
-                const action = worldInstance.determineEnemyAction(enemy);
-                if (action) {
-                    action.apply(enemy, player);
-                } else {
-                    onoConsoleInstance.renderOnEnvironment(`${enemy.name} hesitates.`);
-                }
-            }
+        const rawPlayerInput = onoConsole.getRawPlayerInput("whatever");
+        const playerInput = onoConsole.parsePlayerInput(rawPlayerInput, world);
 
-            worldInstance.updateEncounterPhase(); 
-            
-            if (worldInstance.currentEncounter) {
-                worldInstance.updateTurn();
-                if (worldInstance.isPlayerTurn()) {
-                    const actionChoices = worldInstance.getAllActionsAllowed(player);
-                    worldInstance.showPlayerHUD(actionChoices);
-                    hudShown = true;
-                }
-            }
+        const [actionName, targetIndexStr] = playerInput.split("_");
+        const targetIndex = parseInt(targetIndexStr, 10);
 
+        const actionKey = Object.keys(world.gamePhaseManager.Actions).find(
+          (k) => k.toLowerCase() === actionName.toLowerCase(),
+        );
+        const ActionClass = actionKey
+          ? world.gamePhaseManager.Actions[actionKey]
+          : null;
+        const actionee = world.currentEncounter.enemies[targetIndex];
+
+        if (ActionClass && actionee) {
+          const action = new ActionClass({ worldInstance: world });
+          action.apply(player, actionee);
         }
+      } else {
+        // Enemy's turn
+        const action = world.determineEnemyAction(currentEntity);
+        if (action) {
+          action.apply(currentEntity, player);
+        } else {
+          onoConsole.bufferEvent("battle", `${currentEntity.name} hesitates.`);
+        }
+      }
 
-        console.log("\n--- Battle has concluded. ---");
+      // Check for phase transitions (e.g., combat ending)
+      world.updateGamePhase();
 
-    } catch (error) {
-        console.error(`Failed to run game:`, error);
+      // If encounter is still active, advance to the next turn
+      if (world.currentEncounter) {
+        world.updateTurn();
+      }
     }
+
+    console.log("\n--- Battle has concluded. ---");
+  } catch (error) {
+    console.error(`Failed to run game:`, error);
+  }
 }
 
 // Start the game

@@ -4,7 +4,7 @@ const esbuild = require('esbuild');
 esbuild.build({
   entryPoints: ['./src/aid_hooks.js'], // starting point
   bundle: true,                   // combine into one file
-  minify: true,                    // minify output
+  minify: false,                    // minify output
   outfile: 'dist/aid_hooks.js',        // output file
   sourcemap: true,                 // optional: for debugging
   keepNames: true,                 // preserve function/class names
