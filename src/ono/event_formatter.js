@@ -2,6 +2,17 @@
  * @file OXO Rulebook - Event Formatter (Presentation Logic)
  * @description Translates structured game events into human-readable strings for the 'oxo' rulebook.
  */
+
+const plotEssentials = `
+You are a heroic adventurer in a fantasy world filled with danger and excitement. 
+Your journey begins in a small village, but soon you will face fierce orcs, cunning elves, and other mythical creatures. 
+Use your strength and wits to survive and thrive in this perilous land.
+`;
+
+const authorsNote = `
+Write in a descriptive and engaging style, focusing on the action and the environment.
+`;
+
 class EventFormatter {
   /**
    * Takes an event name and its data payload, and returns a formatted string.
@@ -47,4 +58,4 @@ class EventFormatter {
   }
 }
 
-module.exports = { EventFormatter };
+module.exports = { EventFormatter, plotEssentials, authorsNote };

@@ -9,7 +9,7 @@ const systemName = "aid";
 // --- Imports ---
 const { World } = require("./core/world.js");
 const { GamePhaseManager } = require(`./${rulebookName}/game_phase_manager.js`);
-const { EventFormatter } = require(`./${rulebookName}/event_formatter.js`);
+const { EventFormatter, authorsNote, plotEssentials } = require(`./${rulebookName}/event_formatter.js`);
 const { ONOConsole } = require(`./${systemName}/ono_console.js`);
 
 /**
@@ -21,6 +21,9 @@ function loadGame() {
   const onoConsole = ONOConsole.getInstance();
   const formatter = new EventFormatter();
   const gamePhaseManager = new GamePhaseManager();
+
+  onoConsole.plotEssentials = plotEssentials;
+  onoConsole.authorsNote = authorsNote;
 
   let worldInstance;
 
@@ -108,10 +111,10 @@ function _commonLoop(text) {
   log (`state.authorsNote : ${state.authorsNote}`);
   log (`state._message : ${state._message}`);
 
-  // state.memory.context = state.context;
-  // state.memory.frontMemory = state.frontMemory;
-  // state.memory.authorsNote = state.authorsNote;
-  // state.message = state._message;
+  state.memory.context = state.context;
+  state.memory.frontMemory = state.frontMemory;
+  state.memory.authorsNote = state.authorsNote;
+  state.message = state._message;
 }
 
 /**
@@ -174,10 +177,6 @@ module.exports = { onInput, onOutput, onContext };
 // Every script needs a modifier function
 const modifier = (text) => {
   ono.onInput(text);
-  state.memory.context = state.context;
-  state.memory.frontMemory = state.frontMemory;
-  state.memory.authorsNote = state.authorsNote;
-  state.message = state._message;
   return { text }
 }
 
@@ -189,10 +188,6 @@ modifier(text)
 // Every script needs a modifier function
 const modifier = (text) => {
   ono.onContext(text);
-  state.memory.context = state.context;
-  state.memory.frontMemory = state.frontMemory;
-  state.memory.authorsNote = state.authorsNote;
-  state.message = state._message;
   return { text }
 }
 

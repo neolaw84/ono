@@ -54,11 +54,15 @@ class ONOConsole {
           break;
       }
     }
-
+    
     state.context = context.trim();
     state.frontMemory = frontMemory.trim();
     state.authorsNote = authorsNote.trim();
-    state._message = message.trim();
+
+    state.messagePlusOrMinus = state.messagePlusOrMinus ? state.messagePlusOrMinus : false;
+    let messageBracket = state.messagePlusOrMinus ? "+" : "-";
+    state._message = messageBracket + " " + message.trim() + " " + messageBracket;
+    state.messagePlusOrMinus = !state.messagePlusOrMinus;
 
     this.bufferedEvents = [];
   }

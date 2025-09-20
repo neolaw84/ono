@@ -23,8 +23,8 @@ class World {
     this.gamePhaseManager = gamePhaseManager;
 
     // Pass rule-specific text to the console
-    this.console.plotEssentials = this.gamePhaseManager.plotEssentials;
-    this.console.authorsNote = this.gamePhaseManager.authorsNote;
+    // this.console.plotEssentials = this.gamePhaseManager.plotEssentials;
+    // this.console.authorsNote = this.gamePhaseManager.authorsNote;
   }
 
   // --- State Management Methods ---

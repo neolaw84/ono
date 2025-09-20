@@ -7,16 +7,6 @@ const {
   PermissionGraphBuilder,
 } = require("../core.js");
 
-const plotEssentials = `
-You are a heroic adventurer in a fantasy world filled with danger and excitement. 
-Your journey begins in a small village, but soon you will face fierce orcs, cunning elves, and other mythical creatures. 
-Use your strength and wits to survive and thrive in this perilous land.
-`;
-
-const authorsNote = `
-Write in a descriptive and engaging style, focusing on the action and the environment.
-`;
-
 // --- Attribute Definitions ---
 const CoreStats = createAttributesClass(["hp", "mp", "strength", "defense"]);
 const StatusEffects = createAttributesClass(["poisoned", "stunned", "burning"]);
@@ -88,8 +78,6 @@ const Entities = { Player, Orc, Elf };
 const Actions = { HeavyStrike, BasicAttack };
 
 module.exports = {
-  plotEssentials,
-  authorsNote,
   Entities,
   Actions,
   phaseGraph,
