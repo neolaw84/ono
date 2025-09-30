@@ -67,6 +67,17 @@ function saveGame(worldInstance) {
 
 function _commonLoop(text) {
   const world = loadGame();
+
+  // Delegate game flow management to the rulebook's phase manager.
+  const flowControl = world.gamePhaseManager.manageGameFlow(world);
+  if (flowControl.gameShouldEnd) {
+    // The game has ended (e.g., player defeat). Buffer the final message and stop.
+    world.console.bufferEvent('critical', flowControl.reason);
+    world.console.flushEnvironment();
+    saveGame(world);
+    return; 
+  }
+
   const player = world.player;
 
   if (world.getEntityForThisTurn() === player) {

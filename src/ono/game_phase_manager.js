@@ -20,6 +20,24 @@ class GamePhaseManager {
     this.authorsNote = authorsNote;
   }
 
+  manageGameFlow(world) {
+    // If there's no active encounter, we need to decide what to do next.
+    if (!world.currentEncounter) {
+      // First, check for a definitive game-over condition.
+      if (this.isPlayerDefeated(world)) {
+          return { gameShouldEnd: true, reason: "\n--- You have been defeated. Game Over. ---" };
+      }
+
+      // If the game is not over, it means the player won the last encounter.
+      // Buffer a message and create a new encounter.
+      world.console.bufferEvent('plot', "\n--- Encounter complete! A new challenge appears! ---");
+      world.startNewEncounter();
+    }
+    
+    // Signal to the main loop that the game should continue.
+    return { gameShouldEnd: false };
+  }
+
   // --- Rule Logic Methods ---
 
   isPlayerDefeated(world) {

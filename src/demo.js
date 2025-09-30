@@ -34,12 +34,18 @@ function setupGame() {
     // The world starts in '__start__'. Let's transition to the combat phase.
     world.updateGamePhase();
 
-    // 4. Start a new encounter based on the current game phase
-    world.startNewEncounter();
-
-    // 5. Game Loop
-    console.log("\n--- Starting Battle Loop ---");
-    while (world.currentEncounter) {
+    // 4. Game Loop
+    console.log("\n--- Starting Endless Battle Loop ---");
+    let gameRunning = true;
+    while (gameRunning) {
+        
+      // Delegate game flow management to the rulebook's phase manager.
+      const flowControl = world.gamePhaseManager.manageGameFlow(world);
+      if (flowControl.gameShouldEnd) {
+          console.log(flowControl.reason);
+          gameRunning = false;
+          continue;
+      }
       const currentEntity = world.getEntityForThisTurn();
 
       if (currentEntity === player) {
