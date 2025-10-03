@@ -2,10 +2,10 @@
 const esbuild = require('esbuild');
 
 esbuild.build({
-  entryPoints: ['./src/demo.js'], // starting point
+  entryPoints: ['./src/cli_demo.js'], // starting point
   bundle: true,                   // combine into one file
   minify: true,                    // minify output
-  outfile: 'dist/demo.js',        // output file
+  outfile: 'dist/cli_demo.js',        // output file
   sourcemap: true,                 // optional: for debugging
   keepNames: true,                 // preserve function/class names
   define: {
